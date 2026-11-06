@@ -15,9 +15,9 @@ class FindingResponse(BaseModel):
     category: str  # TONE, TERMINOLOGY, CLAIM_VERIFICATION, BRAND_CONSISTENCY, GRAMMAR
     severity: str  # CRITICAL, WARNING, INFO
 
-    # Canonical text field + backward-compatible alias
+    # Canonical text field + backward-compatible optional alias
     original_text: str
-    matched_text: str
+    matched_text: Optional[str] = None
 
     explanation: str
     suggestion: str

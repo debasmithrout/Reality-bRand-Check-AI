@@ -13,10 +13,10 @@ except ImportError:
     external_analyze_brand_content = None
     ExternalAIEngineError = Exception
 
-# Transparent, agreed severity mapping
+# Transparent, agreed severity mapping with Salman
 SEVERITY_MAPPING = {
     "CRITICAL": "CRITICAL",
-    "HIGH": "CRITICAL",
+    "HIGH": "WARNING",
     "WARNING": "WARNING",
     "MEDIUM": "WARNING",
     "INFO": "INFO",
@@ -29,21 +29,22 @@ ALLOWED_OVERALL_STATUS = {"COMPLIANT", "FLAGGED", "NON_COMPLIANT"}
 
 def calculate_deterministic_compliance_score(findings: List[Dict[str, Any]]) -> float:
     """
-    Explicit Deterministic Compliance Scoring Policy:
+    Explicit Deterministic Compliance Scoring Policy (Agreed with AI Engine):
     - Base score: 100.0
-    - Each CRITICAL / HIGH finding: -25.0
-    - Each WARNING / MEDIUM finding: -10.0
+    - Each CRITICAL finding: -25.0
+    - Each WARNING / HIGH / MEDIUM finding: -10.0
     - Each INFO / LOW finding: -0.0
     - Minimum score floor: 0.0, Maximum ceiling: 100.0
     """
     score = 100.0
     for f in findings:
         sev = (f.get("severity") or "WARNING").upper()
-        if sev in ("CRITICAL", "HIGH"):
+        mapped_sev = SEVERITY_MAPPING.get(sev, "WARNING")
+        if mapped_sev == "CRITICAL":
             score -= 25.0
-        elif sev in ("WARNING", "MEDIUM"):
+        elif mapped_sev == "WARNING":
             score -= 10.0
-        elif sev in ("INFO", "LOW"):
+        elif mapped_sev == "INFO":
             score -= 0.0
     return max(0.0, min(100.0, score))
 

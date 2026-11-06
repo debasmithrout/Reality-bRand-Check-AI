@@ -41,7 +41,7 @@ def test_salman_format_normalization():
     f = normalized["findings"][0]
     assert f["ai_finding_id"] == "SALMAN-001"
     assert f["category"] == "TERMINOLOGY"
-    assert f["severity"] == "CRITICAL"  # HIGH mapped to CRITICAL via explicit mapping
+    assert f["severity"] == "WARNING"  # HIGH mapped to WARNING per agreed severity mapping
     assert f["original_text"] == "cheapest cloud"
     assert f["matched_text"] == "cheapest cloud"  # Alias populated
     assert f["violated_guideline"] == "Terminology Rule: Prohibited Words"

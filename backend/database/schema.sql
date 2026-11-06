@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS findings (
     category VARCHAR(50) NOT NULL CHECK (category IN ('TONE', 'TERMINOLOGY', 'CLAIM_VERIFICATION', 'BRAND_CONSISTENCY', 'GRAMMAR')),
     severity VARCHAR(20) NOT NULL DEFAULT 'WARNING' CHECK (severity IN ('CRITICAL', 'WARNING', 'INFO')),
     original_text TEXT NOT NULL,
-    matched_text TEXT NOT NULL,
+    matched_text TEXT,
     explanation TEXT NOT NULL,
     suggestion TEXT NOT NULL,
     violated_guideline VARCHAR(255),

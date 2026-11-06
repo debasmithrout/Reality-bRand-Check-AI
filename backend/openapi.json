@@ -2803,7 +2803,14 @@
             "title": "Original Text"
           },
           "matched_text": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Matched Text"
           },
           "explanation": {
@@ -2889,7 +2896,6 @@
           "category",
           "severity",
           "original_text",
-          "matched_text",
           "explanation",
           "suggestion",
           "created_at"

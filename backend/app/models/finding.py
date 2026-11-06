@@ -18,9 +18,9 @@ class Finding(Base, TimestampMixin):
     # Severity: CRITICAL, WARNING, INFO
     severity: Mapped[str] = mapped_column(String(20), default="WARNING", nullable=False)
     
-    # Canonical finding text + backward-compatible alias
+    # Canonical finding text + backward-compatible optional alias
     original_text: Mapped[str] = mapped_column(Text, nullable=False)
-    matched_text: Mapped[str] = mapped_column(Text, nullable=False)
+    matched_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     explanation: Mapped[str] = mapped_column(Text, nullable=False)
     suggestion: Mapped[str] = mapped_column(Text, nullable=False)
