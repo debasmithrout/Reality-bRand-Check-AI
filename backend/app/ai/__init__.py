@@ -2,9 +2,16 @@
 Reality bRand Check AI - AI Engine Package
 """
 
-from .analyzer import (
-    analyze_brand_content,
-)
+try:
+    from .analyzer import analyze_brand_content
+    from .gemini_client import GeminiClient, GeminiConfig
+    HAS_GEMINI_CLIENT = True
+except (ImportError, ModuleNotFoundError):
+    analyze_brand_content = None  # type: ignore
+    GeminiClient = None  # type: ignore
+    GeminiConfig = None  # type: ignore
+    HAS_GEMINI_CLIENT = False
+
 from .exceptions import (
     AIEngineError,
     AI_API_ERROR,

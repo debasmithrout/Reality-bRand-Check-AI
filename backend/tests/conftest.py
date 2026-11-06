@@ -29,6 +29,17 @@ def setup_test_db():
     Base.metadata.drop_all(bind=test_engine)
 
 
+@pytest.fixture(autouse=True)
+def isolate_ai_environment(monkeypatch):
+    """
+    Ensure automated test suite runs are hermetic, deterministic, and offline.
+    Prevents unit and integration tests from unintentionally dispatching unmocked
+    live HTTP calls to Google's Gemini API when a real GEMINI_API_KEY exists in local .env.
+    """
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+
+
 @pytest.fixture
 def db_session():
     connection = test_engine.connect()

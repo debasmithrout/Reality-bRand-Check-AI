@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     # AI Integration
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash"
+    GEMINI_TIMEOUT: float = 30.0
     OPENAI_API_KEY: str = ""
 
     @property
