@@ -1,3 +1,7 @@
+"""
+Reality bRand Check AI - Backend Application Entry Point
+"""
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
