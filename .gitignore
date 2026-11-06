@@ -232,6 +232,7 @@ web_modules/
 
 # Production builds
 dist/
+*.tsbuildinfo
 dist-ssr/
 build/
 out/

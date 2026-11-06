@@ -2,25 +2,32 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/common/Logo';
 import { Alert } from '../components/common/Alert';
-import { ArrowRight, Lock, Mail, User } from 'lucide-react';
+import { ArrowRight, Lock, Mail, User, RefreshCw } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { ApiError } from '../services/httpClient';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const { register } = useAuth();
+
   const [formData, setFormData] = useState({
-    name: 'Brand Reviewer',
-    email: 'reviewer@enterprise.com',
+    name: '',
+    email: '',
     password: '',
     confirmPassword: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [successMsg, setSuccessMsg] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = () => {
     const errs: Record<string, string> = {};
 
     if (!formData.name.trim()) {
       errs.name = 'Full name is required.';
+    } else if (formData.name.trim().length < 2) {
+      errs.name = 'Full name must be at least 2 characters.';
     }
 
     if (!formData.email.trim()) {
@@ -43,14 +50,30 @@ export const RegisterPage: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || isSubmitting) return;
 
-    setSuccessMsg(true);
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 1200);
+    setIsSubmitting(true);
+    setApiError(null);
+
+    try {
+      await register({
+        full_name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        role: 'EDITOR',
+      });
+      navigate('/dashboard', { replace: true });
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setApiError(err.message);
+      } else {
+        setApiError('Unable to complete registration. Please check your network or server status.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -70,13 +93,9 @@ export const RegisterPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-sm border border-gray-200 sm:rounded-xl sm:px-10">
-          <Alert type="info" title="Registration (Demo Prototype)" className="mb-6">
-            Authentication backend is not active in this prototype milestone. Form performs client-side field validation and proceeds to Dashboard.
-          </Alert>
-
-          {successMsg && (
-            <Alert type="success" title="Validation Successful!" className="mb-6">
-              Redirecting you to the dashboard...
+          {apiError && (
+            <Alert type="error" title="Registration Failed" className="mb-6">
+              {apiError}
             </Alert>
           )}
 
@@ -93,8 +112,9 @@ export const RegisterPage: React.FC = () => {
                   id="name"
                   type="text"
                   value={formData.name}
+                  disabled={isSubmitting}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 disabled:bg-gray-50 ${
                     errors.name
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
@@ -117,8 +137,9 @@ export const RegisterPage: React.FC = () => {
                   id="email"
                   type="email"
                   value={formData.email}
+                  disabled={isSubmitting}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 disabled:bg-gray-50 ${
                     errors.email
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
@@ -141,8 +162,9 @@ export const RegisterPage: React.FC = () => {
                   id="password"
                   type="password"
                   value={formData.password}
+                  disabled={isSubmitting}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 disabled:bg-gray-50 ${
                     errors.password
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
@@ -165,8 +187,9 @@ export const RegisterPage: React.FC = () => {
                   id="confirmPassword"
                   type="password"
                   value={formData.confirmPassword}
+                  disabled={isSubmitting}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 disabled:bg-gray-50 ${
                     errors.confirmPassword
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
@@ -182,10 +205,20 @@ export const RegisterPage: React.FC = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                disabled={isSubmitting}
+                className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
               >
-                Register & Enter Dashboard
-                <ArrowRight className="h-4 w-4" />
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  <>
+                    Register & Enter Dashboard
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -200,4 +233,3 @@ export const RegisterPage: React.FC = () => {
     </div>
   );
 };
-

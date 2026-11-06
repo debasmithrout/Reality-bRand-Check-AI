@@ -1,13 +1,22 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, FileSearch, ShieldAlert, Sparkles, LogOut } from 'lucide-react';
 import { Logo } from '../common/Logo';
+import { useAuth } from '../../context/AuthContext';
 
 export const DashboardSidebar: React.FC = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   const navItems = [
     { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
     { label: 'Content Review', to: '/review', icon: FileSearch },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <aside className="w-64 border-r border-gray-200 bg-white flex flex-col min-h-screen">
@@ -56,19 +65,23 @@ export const DashboardSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Demo status banner at sidebar bottom */}
+      {/* Authenticated user session info and logout */}
       <div className="p-4 border-t border-gray-100 bg-gray-50 m-4 rounded-xl">
-        <div className="text-xs font-semibold text-gray-900">Demo Environment</div>
-        <div className="text-xs text-gray-500 mt-0.5">Frontend Foundation (Sample Data)</div>
-        <NavLink
-          to="/login"
-          className="mt-3 flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-rose-600 transition-colors"
+        <div className="text-xs font-semibold text-gray-900 truncate">
+          {user?.full_name || 'Authenticated User'}
+        </div>
+        <div className="text-[11px] text-gray-500 truncate mt-0.5">
+          {user?.email || 'Logged in'}
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-3 w-full flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-rose-600 transition-colors cursor-pointer"
         >
           <LogOut className="h-3.5 w-3.5" />
-          <span>Exit / Return to Login</span>
-        </NavLink>
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
   );
 };
-

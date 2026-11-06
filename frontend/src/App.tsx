@@ -6,6 +6,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ContentReviewPage } from './pages/ContentReviewPage';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 export const App: React.FC = () => {
   return (
@@ -15,10 +16,12 @@ export const App: React.FC = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
-      {/* Dashboard & Review Internal Area */}
-      <Route path="/" element={<DashboardLayout />}>
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="review" element={<ContentReviewPage />} />
+      {/* Protected Dashboard & Review Internal Area */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="review" element={<ContentReviewPage />} />
+        </Route>
       </Route>
 
       {/* Fallback */}
@@ -28,4 +31,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

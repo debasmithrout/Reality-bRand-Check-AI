@@ -1,3 +1,48 @@
+export type UserRole = 'ADMIN' | 'EDITOR' | 'REVIEWER';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  workspace_id: string;
+  avatar_url?: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  full_name: string;
+  role?: UserRole;
+  workspace_id?: string;
+}
+
+export interface ApiResponseEnvelope<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
+export interface ApiErrorDetail {
+  field?: string;
+  message: string;
+  type?: string;
+}
+
 export interface Brand {
   id: string;
   name: string;
@@ -45,4 +90,3 @@ export interface DashboardMetric {
   isPositive: boolean;
   description: string;
 }
-
