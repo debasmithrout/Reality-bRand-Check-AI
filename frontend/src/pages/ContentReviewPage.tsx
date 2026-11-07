@@ -1,37 +1,94 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { FindingsList } from '../components/review/FindingsList';
 import { SuggestedCorrection } from '../components/review/SuggestedCorrection';
-import { brandService, reviewService } from '../services/api';
-import { Brand, ContentReviewResult } from '../types';
+import { reviewService } from '../services/api';
+import { brandService, extractToneOfVoice } from '../services/brandService';
+import { BrandResponse, ContentReviewResult, GuidelineResponse, TerminologyResponse } from '../types';
 import { Alert } from '../components/common/Alert';
 import { getScoreBadgeColor } from '../utils/formatters';
-import { Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Sparkles, RefreshCw, AlertTriangle, AlertCircle, BookOpen, Ban } from 'lucide-react';
+import { ApiError } from '../services/httpClient';
 
 export const ContentReviewPage: React.FC = () => {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [selectedBrandId, setSelectedBrandId] = useState<string>('b-1');
+  const [brands, setBrands] = useState<BrandResponse[]>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('');
+  const [guidelines, setGuidelines] = useState<GuidelineResponse | null>(null);
+  const [terminology, setTerminology] = useState<TerminologyResponse[]>([]);
+  const [loadingBrands, setLoadingBrands] = useState<boolean>(true);
+  const [brandError, setBrandError] = useState<string | null>(null);
+
   const [inputText, setInputText] = useState<string>(
     'Nexus Cloud offers cheap enterprise servers with guaranteed 100% uptime for all operations.'
   );
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<ContentReviewResult | null>(null);
 
-  useEffect(() => {
-    brandService.getBrands().then((data) => {
-      setBrands(data);
-      if (data.length > 0) {
+  // Load brands for workspace
+  const fetchBrands = useCallback(async () => {
+    setLoadingBrands(true);
+    setBrandError(null);
+    try {
+      const data = await brandService.getBrands(true);
+      setBrands(data || []);
+      if (data && data.length > 0) {
         setSelectedBrandId(data[0].id);
+      } else {
+        setSelectedBrandId('');
       }
-    });
-
-    // Auto-run initial demo analysis for showcase
-    reviewService.analyzeContent(inputText, 'b-1').then(setAnalysisResult);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setBrandError(err.message);
+      } else {
+        setBrandError('Failed to load workspace brand profiles.');
+      }
+    } finally {
+      setLoadingBrands(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchBrands();
+  }, [fetchBrands]);
+
+  // When selectedBrandId changes, fetch its guidelines and terminology
+  useEffect(() => {
+    if (!selectedBrandId) {
+      setGuidelines(null);
+      setTerminology([]);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchBrandDetails = async () => {
+      try {
+        const [g, t] = await Promise.all([
+          brandService.getGuidelines(selectedBrandId).catch(() => null),
+          brandService.getTerminology(selectedBrandId).catch(() => []),
+        ]);
+        if (!isCancelled) {
+          setGuidelines(g);
+          setTerminology(t || []);
+        }
+      } catch {
+        if (!isCancelled) {
+          setGuidelines(null);
+          setTerminology([]);
+        }
+      }
+    };
+
+    fetchBrandDetails();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedBrandId]);
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !selectedBrandId) return;
 
     setIsAnalyzing(true);
     try {
@@ -43,6 +100,7 @@ export const ContentReviewPage: React.FC = () => {
   };
 
   const selectedBrand = brands.find((b) => b.id === selectedBrandId);
+  const prohibitedTerms = terminology.filter((t) => t.term_type === 'PROHIBITED');
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -52,9 +110,26 @@ export const ContentReviewPage: React.FC = () => {
       />
 
       <div className="p-6 sm:p-8 space-y-6 max-w-7xl">
-        {/* Transparent Demo Notice */}
-        <Alert type="info" title="Demo Analysis Mode Active">
-          This preview uses clearly labeled demo analysis rules and sample findings. Gemini AI analysis and FastAPI services will be plugged in directly once the backend pipeline is enabled.
+        {/* Brand loading error alert */}
+        {brandError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between text-red-800 text-sm">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+              <span>{brandError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={fetchBrands}
+              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Notice for Demo AI Analysis */}
+        <Alert type="info" title="Phase 4B Connected: Live Brand & Guidelines Integration">
+          Brand profiles, guidelines, and terminology rules are now dynamically loaded from your active FastAPI workspace. AI submission & real-time evaluation pipeline is scheduled for Phase 4C.
         </Alert>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -64,31 +139,81 @@ export const ContentReviewPage: React.FC = () => {
 
             <form onSubmit={handleAnalyze} className="space-y-4">
               <div>
-                <label htmlFor="brand-select" className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
+                <label
+                  htmlFor="brand-select"
+                  className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5"
+                >
                   Target Brand Guidelines
                 </label>
-                <select
-                  id="brand-select"
-                  value={selectedBrandId}
-                  onChange={(e) => setSelectedBrandId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-800"
-                >
-                  {brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </option>
-                  ))}
-                </select>
+
+                {loadingBrands ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-500 py-2">
+                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                    <span>Loading workspace brands...</span>
+                  </div>
+                ) : brands.length === 0 ? (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
+                    No active brand profiles found in this workspace.
+                  </div>
+                ) : (
+                  <select
+                    id="brand-select"
+                    value={selectedBrandId}
+                    onChange={(e) => setSelectedBrandId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-800"
+                  >
+                    {brands.map((brand) => (
+                      <option key={brand.id} value={brand.id}>
+                        {brand.name} {brand.industry ? `(${brand.industry})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Selected Brand Guidelines Snippet */}
                 {selectedBrand && (
-                  <p className="mt-1.5 text-xs text-gray-500 italic">
-                    Tone: {selectedBrand.voiceTone}
-                  </p>
+                  <div className="mt-2.5 p-3 bg-gray-50 border border-gray-100 rounded-lg space-y-1.5 text-xs text-gray-600">
+                    <div className="flex items-center gap-1.5 font-medium text-gray-700">
+                      <BookOpen className="h-3.5 w-3.5 text-blue-600" />
+                      <span>Tone of Voice:</span>
+                    </div>
+                    <p className="italic text-gray-600 pl-5">
+                      {extractToneOfVoice(guidelines, selectedBrand.description || 'Standard Enterprise Tone')}
+                    </p>
+
+                    {prohibitedTerms.length > 0 && (
+                      <div className="pt-1">
+                        <div className="flex items-center gap-1.5 font-medium text-rose-700 mb-1">
+                          <Ban className="h-3 w-3 text-rose-500" />
+                          <span>{prohibitedTerms.length} Prohibited Terms Loaded</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 pl-4">
+                          {prohibitedTerms.slice(0, 4).map((t) => (
+                            <span
+                              key={t.id}
+                              className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-mono"
+                            >
+                              {t.term}
+                            </span>
+                          ))}
+                          {prohibitedTerms.length > 4 && (
+                            <span className="text-[10px] text-gray-400">
+                              +{prohibitedTerms.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="content-input" className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+                  <label
+                    htmlFor="content-input"
+                    className="block text-xs font-semibold uppercase tracking-wider text-gray-600"
+                  >
                     Marketing Copy to Verify
                   </label>
                   <span className="text-xs text-gray-400 font-mono">{inputText.length} chars</span>
@@ -106,7 +231,7 @@ export const ContentReviewPage: React.FC = () => {
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="submit"
-                  disabled={isAnalyzing || !inputText.trim()}
+                  disabled={isAnalyzing || !inputText.trim() || !selectedBrandId}
                   className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-colors shadow-sm"
                 >
                   {isAnalyzing ? (
@@ -205,7 +330,7 @@ export const ContentReviewPage: React.FC = () => {
               </div>
             ) : (
               <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
-                Click "Analyze Content" to view sample findings and automated rewrites.
+                Click "Analyze Content" to view findings and automated rewrites.
               </div>
             )}
           </div>

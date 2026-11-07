@@ -34,14 +34,18 @@ export const BrandOverviewCard: React.FC<BrandOverviewCardProps> = ({ brand }) =
             <span>Prohibited Terms:</span>
           </div>
           <div className="flex flex-wrap gap-1.5 pl-5">
-            {brand.prohibitedTerms.map((term, i) => (
-              <span
-                key={i}
-                className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded text-[11px] font-mono border border-rose-100"
-              >
-                {term}
-              </span>
-            ))}
+            {brand.prohibitedTerms && brand.prohibitedTerms.length > 0 ? (
+              brand.prohibitedTerms.map((term, i) => (
+                <span
+                  key={i}
+                  className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded text-[11px] font-mono border border-rose-100"
+                >
+                  {term}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-400 italic text-[11px]">None defined</span>
+            )}
           </div>
         </div>
 
@@ -51,7 +55,9 @@ export const BrandOverviewCard: React.FC<BrandOverviewCardProps> = ({ brand }) =
             <span>Mandatory Disclaimers:</span>
           </div>
           <p className="text-gray-600 pl-5 text-[11px]">
-            {brand.mandatoryDisclaimers.join(', ')}
+            {brand.mandatoryDisclaimers && brand.mandatoryDisclaimers.length > 0
+              ? brand.mandatoryDisclaimers.join(', ')
+              : 'None required'}
           </p>
         </div>
       </div>

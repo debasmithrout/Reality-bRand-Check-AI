@@ -67,7 +67,7 @@ export const httpClient = {
 
     // Attach Authorization header if token exists and skipAuth is not true
     if (!options.skipAuth) {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null;
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }

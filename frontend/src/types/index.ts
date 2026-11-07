@@ -43,6 +43,49 @@ export interface ApiErrorDetail {
   type?: string;
 }
 
+// ==========================================
+// Backend Brand & Guidelines Models
+// ==========================================
+
+export interface BrandResponse {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description?: string | null;
+  industry?: string | null;
+  website?: string | null;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GuidelineResponse {
+  id: string;
+  brand_id: string;
+  brand_personality?: any;
+  tone_of_voice?: any;
+  messaging_rules?: any;
+  additional_guidelines?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TerminologyType = 'APPROVED' | 'PROHIBITED' | 'PREFERRED';
+
+export interface TerminologyResponse {
+  id: string;
+  brand_id: string;
+  term: string;
+  term_type: TerminologyType;
+  preferred_replacement?: string | null;
+  description?: string | null;
+  is_case_sensitive: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Enriched Brand Model used by frontend components
 export interface Brand {
   id: string;
   name: string;
@@ -50,7 +93,52 @@ export interface Brand {
   voiceTone: string;
   prohibitedTerms: string[];
   mandatoryDisclaimers: string[];
+  industry?: string;
+  website?: string;
+  workspaceId?: string;
+  isActive?: boolean;
 }
+
+// ==========================================
+// Backend Dashboard & Submission Models
+// ==========================================
+
+export interface ComplianceMetrics {
+  average_compliance_score: number;
+  total_submissions: number;
+  pending_reviews: number;
+  approved_submissions: number;
+  rejected_submissions: number;
+  total_findings: number;
+  critical_findings: number;
+}
+
+export interface BackendSubmissionResponse {
+  id: string;
+  brand_id: string;
+  workspace_id: string;
+  title: string;
+  content: string;
+  channel?: string | null;
+  status: string; // APPROVED, NEEDS_REVIEW, REJECTED, DRAFT
+  submitted_by: string;
+  compliance_score?: number | null;
+  overall_status?: string | null;
+  summary?: string | null;
+  corrected_content?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DashboardSummaryResponse {
+  metrics: ComplianceMetrics;
+  recent_submissions: BackendSubmissionResponse[];
+  active_brands_count: number;
+}
+
+// ==========================================
+// Frontend Component Display Models
+// ==========================================
 
 export interface ReviewFinding {
   id: string;
@@ -79,7 +167,7 @@ export interface SubmissionItem {
   brand: string;
   channel: string;
   score: number;
-  status: 'Approved' | 'Needs Revision' | 'Pending Review';
+  status: 'Approved' | 'Needs Revision' | 'Pending Review' | 'Rejected';
   submittedAt: string;
 }
 
