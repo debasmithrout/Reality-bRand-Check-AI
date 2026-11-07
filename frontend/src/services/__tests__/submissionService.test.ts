@@ -282,6 +282,192 @@ describe('submissionService and analysis workflow', () => {
         })
       );
     });
+
+    it('reopens a resolved finding on PATCH /findings/:id with is_resolved: false', async () => {
+      const reopenedFinding: FindingResponse = {
+        id: 'find-01',
+        submission_id: 'sub-101',
+        category: 'TERMINOLOGY',
+        severity: 'CRITICAL',
+        original_text: 'cheap',
+        explanation: 'Contradicts brand tone.',
+        suggestion: 'accessible luxury',
+        is_resolved: false,
+        created_at: '2026-11-07T10:00:00Z',
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: reopenedFinding,
+            message: 'Finding updated.',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await submissionService.updateFindingStatus('find-01', false);
+      expect(res.is_resolved).toBe(false);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/findings/find-01'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ is_resolved: false }),
+        })
+      );
+    });
+  });
+
+  describe('approveSubmission and rejectSubmission (Human Editorial Decisions)', () => {
+    it('approves submission on POST /submissions/:id/approve with reviewer comments', async () => {
+      const fakeApproval = {
+        id: 'appr-01',
+        submission_id: 'sub-101',
+        decision: 'APPROVED',
+        reviewer_id: 'rev-user-02',
+        comments: 'Certified for publication in Q4 campaign.',
+        created_at: '2026-11-07T10:15:00Z',
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: fakeApproval,
+            message: 'Submission approved successfully.',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await submissionService.approveSubmission(
+        'sub-101',
+        'Certified for publication in Q4 campaign.'
+      );
+
+      expect(res).toEqual(fakeApproval);
+      expect(res.decision).toBe('APPROVED');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/submissions/sub-101/approve'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Certified for publication in Q4 campaign.' }),
+        })
+      );
+    });
+
+    it('approves submission without comments (null comments payload)', async () => {
+      const fakeApproval = {
+        id: 'appr-02',
+        submission_id: 'sub-101',
+        decision: 'APPROVED',
+        reviewer_id: 'rev-user-02',
+        comments: null,
+        created_at: '2026-11-07T10:16:00Z',
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: fakeApproval,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await submissionService.approveSubmission('sub-101');
+      expect(res.comments).toBeNull();
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/submissions/sub-101/approve'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ comments: null }),
+        })
+      );
+    });
+
+    it('rejects submission on POST /submissions/:id/reject with mandatory feedback', async () => {
+      const fakeRejection = {
+        id: 'appr-03',
+        submission_id: 'sub-101',
+        decision: 'REJECTED',
+        reviewer_id: 'rev-user-02',
+        comments: 'Critical prohibited terms remain unresolved.',
+        created_at: '2026-11-07T10:20:00Z',
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: fakeRejection,
+            message: 'Submission rejected.',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await submissionService.rejectSubmission(
+        'sub-101',
+        'Critical prohibited terms remain unresolved.'
+      );
+
+      expect(res).toEqual(fakeRejection);
+      expect(res.decision).toBe('REJECTED');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/submissions/sub-101/reject'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Critical prohibited terms remain unresolved.' }),
+        })
+      );
+    });
+
+    it('throws ApiError when anti-self-approval enforcement returns HTTP 403', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              code: 'FORBIDDEN',
+              message:
+                'Self-approval is prohibited. Another reviewer must approve this submission.',
+            },
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      await expect(
+        submissionService.approveSubmission('sub-101', 'Trying to approve own work')
+      ).rejects.toThrow(ApiError);
+
+      await expect(
+        submissionService.approveSubmission('sub-101', 'Trying to approve own work')
+      ).rejects.toThrow(/Self-approval is prohibited/);
+    });
+
+    it('throws ApiError when editor role attempts to decide on a submission (HTTP 403)', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              code: 'FORBIDDEN',
+              message: 'Only users with REVIEWER or ADMIN role can approve or reject submissions.',
+            },
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      await expect(submissionService.rejectSubmission('sub-101')).rejects.toThrow(ApiError);
+      await expect(submissionService.rejectSubmission('sub-101')).rejects.toThrow(
+        /Only users with REVIEWER or ADMIN role/
+      );
+    });
   });
 });
 

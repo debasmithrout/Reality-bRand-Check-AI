@@ -5,6 +5,7 @@
 
 import { httpClient } from './httpClient';
 import {
+  ApprovalResponse,
   BackendSubmissionResponse,
   FindingResponse,
   RevisionCreatePayload,
@@ -86,6 +87,24 @@ export const submissionService = {
    */
   async updateFindingStatus(findingId: string, isResolved: boolean): Promise<FindingResponse> {
     return httpClient.patch<FindingResponse>(`/findings/${findingId}`, { is_resolved: isResolved });
+  },
+
+  /**
+   * Approve marketing copy for publication after review (requires REVIEWER or ADMIN).
+   */
+  async approveSubmission(submissionId: string, comments?: string): Promise<ApprovalResponse> {
+    return httpClient.post<ApprovalResponse>(`/submissions/${submissionId}/approve`, {
+      comments: comments || null,
+    });
+  },
+
+  /**
+   * Reject marketing copy due to brand compliance failures (requires REVIEWER or ADMIN).
+   */
+  async rejectSubmission(submissionId: string, comments?: string): Promise<ApprovalResponse> {
+    return httpClient.post<ApprovalResponse>(`/submissions/${submissionId}/reject`, {
+      comments: comments || null,
+    });
   },
 };
 

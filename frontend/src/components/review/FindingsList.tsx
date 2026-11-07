@@ -80,14 +80,15 @@ export const FindingsList: React.FC<FindingsListProps> = ({ findings, onToggleRe
                   <button
                     type="button"
                     onClick={() => onToggleResolve(f.id, f.is_resolved)}
+                    title={f.is_resolved ? 'Click to reopen this finding' : 'Click to mark this finding as addressed'}
                     className={`ml-1 text-[11px] font-medium px-2 py-0.5 rounded border flex items-center gap-1 transition-colors ${
                       f.is_resolved
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
                         : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    <CheckCircle2 className="h-3 w-3" />
-                    <span>{f.is_resolved ? 'Resolved' : 'Mark Resolved'}</span>
+                    <CheckCircle2 className={`h-3 w-3 ${f.is_resolved ? 'text-emerald-600' : 'text-gray-400'}`} />
+                    <span>{f.is_resolved ? 'Resolved (Reopen)' : 'Mark Resolved'}</span>
                   </button>
                 )}
               </div>

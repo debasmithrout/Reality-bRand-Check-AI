@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { FindingsList } from '../components/review/FindingsList';
 import { SuggestedCorrection } from '../components/review/SuggestedCorrection';
+import { DecisionModal } from '../components/review/DecisionModal';
+import { RevisionHistory } from '../components/review/RevisionHistory';
+import { AuditTimeline } from '../components/review/AuditTimeline';
 import { brandService, extractToneOfVoice } from '../services/brandService';
 import { submissionService } from '../services/submissionService';
 import {
@@ -19,12 +23,16 @@ import {
   BookOpen,
   Ban,
   CheckCircle2,
+  XCircle,
   Cpu,
-  History,
+  ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import { ApiError } from '../services/httpClient';
 
 export const ContentReviewPage: React.FC = () => {
+  const { user } = useAuth();
+
   const [brands, setBrands] = useState<BrandResponse[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
   const [guidelines, setGuidelines] = useState<GuidelineResponse | null>(null);
@@ -44,6 +52,10 @@ export const ContentReviewPage: React.FC = () => {
   const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Human Review & Decision Modal State
+  const [decisionModalOpen, setDecisionModalOpen] = useState<boolean>(false);
+  const [decisionType, setDecisionType] = useState<'APPROVE' | 'REJECT'>('APPROVE');
 
   // Load active brands for workspace
   const fetchBrands = useCallback(async () => {
@@ -126,10 +138,8 @@ export const ContentReviewPage: React.FC = () => {
   const handleAnalyze = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    // Prevent duplicate clicks
     if (isAnalyzing) return;
 
-    // Validation
     if (!selectedBrandId) {
       setValidationError('Please select an active brand profile before initiating analysis.');
       return;
@@ -170,7 +180,7 @@ export const ContentReviewPage: React.FC = () => {
       const fullDetails = await submissionService.getSubmission(submissionIdToAnalyze);
 
       setCurrentSubmission(fullDetails);
-      setPendingSubmissionId(null); // Completed cleanly
+      setPendingSubmissionId(null);
     } catch (err: any) {
       if (err instanceof ApiError) {
         setAnalysisError(err.message);
@@ -203,14 +213,14 @@ export const ContentReviewPage: React.FC = () => {
   };
 
   // Save human-reviewed formal revision
-  const handleSaveRevision = async (revisedText: string) => {
+  const handleSaveRevision = async (changesSummary: string) => {
     if (!currentSubmission) return;
     try {
       await submissionService.createRevision(currentSubmission.id, {
-        content: revisedText,
-        changes_summary: 'Applied brand-compliant editorial adjustments.',
+        content: inputText,
+        changes_summary: changesSummary,
       });
-      // Refresh submission to show updated revision history
+      // Refresh submission to show updated revision history and transition to DRAFT
       const updated = await submissionService.getSubmission(currentSubmission.id);
       setCurrentSubmission(updated);
     } catch (err: any) {
@@ -220,10 +230,38 @@ export const ContentReviewPage: React.FC = () => {
     }
   };
 
+  // Process human editorial approval or rejection
+  const handleConfirmDecision = async (comments: string) => {
+    if (!currentSubmission) return;
+    try {
+      if (decisionType === 'APPROVE') {
+        await submissionService.approveSubmission(currentSubmission.id, comments);
+      } else {
+        await submissionService.rejectSubmission(currentSubmission.id, comments);
+      }
+      // Re-fetch submission to get updated status and approval record
+      const updated = await submissionService.getSubmission(currentSubmission.id);
+      setCurrentSubmission(updated);
+    } catch (err: any) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to process editorial decision.';
+      setAnalysisError(msg);
+      throw err;
+    }
+  };
+
   const selectedBrand = brands.find((b) => b.id === selectedBrandId);
   const prohibitedTerms = terminology.filter((t) => t.term_type === 'PROHIBITED');
-
   const isHeuristicFallback = currentSubmission?.summary?.includes('[Heuristic Fallback Engine]');
+
+  // Governance permission checks
+  const isEditor = user?.role === 'EDITOR';
+  const isAuthor = currentSubmission ? currentSubmission.submitted_by === user?.id : false;
+  const isSelfApprovalBlocked = isAuthor && user?.role === 'REVIEWER';
+  const canDecide = (user?.role === 'ADMIN' || user?.role === 'REVIEWER') && !isSelfApprovalBlocked;
+
+  const openFindingsCount = currentSubmission?.findings
+    ? currentSubmission.findings.filter((f) => !f.is_resolved).length
+    : 0;
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -264,7 +302,7 @@ export const ContentReviewPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
               <div>
-                <span className="font-semibold">Analysis Failure:</span> {analysisError}
+                <span className="font-semibold">Analysis Notice:</span> {analysisError}
               </div>
             </div>
             <button
@@ -472,7 +510,7 @@ export const ContentReviewPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Analysis Results */}
+          {/* Right Column: Analysis Results & Human Governance */}
           <div className="lg:col-span-7 space-y-6">
             {isAnalyzing ? (
               <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-600 shadow-sm space-y-3">
@@ -537,7 +575,56 @@ export const ContentReviewPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Overall Status Banner */}
+                {/* State-Specific Governance Banners */}
+                {currentSubmission.status === 'APPROVED' && (
+                  <div className="p-4 bg-emerald-50 border-2 border-emerald-500/30 rounded-xl flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-emerald-900">
+                          Certified for Publication & Production Release
+                        </h4>
+                        <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                          APPROVED
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-800">
+                        This marketing copy has received authorized human reviewer sign-off and adheres to brand compliance standards.
+                      </p>
+                      {currentSubmission.approvals && currentSubmission.approvals.length > 0 && currentSubmission.approvals[currentSubmission.approvals.length - 1].comments && (
+                        <div className="mt-2 text-xs bg-emerald-100/60 p-2 rounded border border-emerald-200 text-emerald-900 italic">
+                          Reviewer Note: "{currentSubmission.approvals[currentSubmission.approvals.length - 1].comments}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {currentSubmission.status === 'REJECTED' && (
+                  <div className="p-4 bg-rose-50 border-2 border-rose-500/30 rounded-xl flex items-start gap-3">
+                    <XCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-rose-900">
+                          Submission Rejected by Editorial Review
+                        </h4>
+                        <span className="text-[11px] font-semibold bg-rose-100 text-rose-800 px-2 py-0.5 rounded border border-rose-300">
+                          REJECTED
+                        </span>
+                      </div>
+                      <p className="text-xs text-rose-800">
+                        This draft does not meet brand governance requirements. Please address the flagged findings, update the copy, and save a revision to resubmit for analysis.
+                      </p>
+                      {currentSubmission.approvals && currentSubmission.approvals.length > 0 && currentSubmission.approvals[currentSubmission.approvals.length - 1].comments && (
+                        <div className="mt-2 text-xs bg-rose-100/60 p-2 rounded border border-rose-200 text-rose-900 italic">
+                          Reason: "{currentSubmission.approvals[currentSubmission.approvals.length - 1].comments}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Overall Compliance Category Banner */}
                 {currentSubmission.overall_status === 'COMPLIANT' ? (
                   <div className="flex items-center gap-3 p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs">
                     <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
@@ -566,6 +653,86 @@ export const ContentReviewPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Human Editorial Decision & Sign-off Panel (Available when in NEEDS_REVIEW) */}
+                {currentSubmission.status === 'NEEDS_REVIEW' && (
+                  <div className="p-5 bg-gradient-to-r from-gray-50 to-indigo-50/40 border border-indigo-100 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                        <h4 className="text-sm font-bold text-gray-900">
+                          Human Editorial Decision & Sign-Off
+                        </h4>
+                      </div>
+                      <span className="text-[11px] font-medium text-gray-600 bg-white border border-gray-200 px-2 py-0.5 rounded shadow-2xs">
+                        AI recommends • Humans decide
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      Automated brand compliance evaluation is complete. Review findings and corrections, then make the final determination before publication.
+                    </p>
+
+                    {/* Role restriction banner */}
+                    {isEditor && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2">
+                        <Lock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold">Role Restriction (Editor):</span> You have permission to edit content and resolve findings. Final publication approval or rejection requires an account with <strong>REVIEWER</strong> or <strong>ADMIN</strong> role.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Anti-self-approval banner */}
+                    {isSelfApprovalBlocked && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2">
+                        <Lock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold">Anti-Self-Approval Policy:</span> You authored this submission. Under brand governance policy, peer review is required—another Reviewer or Admin must sign off on publication.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-3 pt-2">
+                      <button
+                        type="button"
+                        disabled={!canDecide}
+                        onClick={() => {
+                          setDecisionType('APPROVE');
+                          setDecisionModalOpen(true);
+                        }}
+                        title={
+                          !canDecide
+                            ? 'Approval requires an authorized Reviewer or Admin (not author)'
+                            : 'Approve submission for publication'
+                        }
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>Approve Copy</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!canDecide}
+                        onClick={() => {
+                          setDecisionType('REJECT');
+                          setDecisionModalOpen(true);
+                        }}
+                        title={
+                          !canDecide
+                            ? 'Rejection requires an authorized Reviewer or Admin (not author)'
+                            : 'Reject submission due to compliance issues'
+                        }
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-rose-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed text-rose-700 border border-rose-300 text-xs font-semibold rounded-lg shadow-xs transition-colors"
+                      >
+                        <XCircle className="h-4 w-4 text-rose-600" />
+                        <span>Reject Copy</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Summary Section */}
                 {currentSubmission.summary && (
                   <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100">
@@ -580,7 +747,7 @@ export const ContentReviewPage: React.FC = () => {
                     <span>Detected Brand Findings & Deviations</span>
                     <span className="text-xs text-gray-500 font-normal">
                       {currentSubmission.findings.length}{' '}
-                      {currentSubmission.findings.length === 1 ? 'issue' : 'issues'} identified
+                      {currentSubmission.findings.length === 1 ? 'issue' : 'issues'} identified ({currentSubmission.findings.filter((f) => f.is_resolved).length} resolved)
                     </span>
                   </h4>
                   <FindingsList
@@ -598,35 +765,19 @@ export const ContentReviewPage: React.FC = () => {
                   />
                 )}
 
-                {/* Revision History */}
-                {currentSubmission.revisions && currentSubmission.revisions.length > 0 && (
-                  <div className="border-t border-gray-100 pt-4">
-                    <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <History className="h-3.5 w-3.5 text-blue-600" />
-                      <span>Revision History ({currentSubmission.revisions.length})</span>
-                    </h5>
-                    <div className="space-y-1.5 text-xs text-gray-600">
-                      {currentSubmission.revisions.map((rev) => (
-                        <div
-                          key={rev.id}
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100"
-                        >
-                          <div>
-                            <span className="font-semibold text-gray-800">
-                              Version {rev.version}
-                            </span>
-                            {rev.changes_summary && (
-                              <span className="text-gray-500 ml-2">— {rev.changes_summary}</span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-gray-400 font-mono">
-                            {new Date(rev.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Revision History Management */}
+                <RevisionHistory
+                  revisions={currentSubmission.revisions || []}
+                  currentContent={inputText}
+                  onLoadRevision={(content) => handleContentChange(content)}
+                  onSaveRevision={handleSaveRevision}
+                />
+
+                {/* Chronological Governance Audit Timeline */}
+                <AuditTimeline
+                  submission={currentSubmission}
+                  currentUserId={user?.id}
+                />
               </div>
             ) : (
               <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400 space-y-2">
@@ -641,6 +792,19 @@ export const ContentReviewPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Editorial Decision Modal */}
+      {currentSubmission && (
+        <DecisionModal
+          isOpen={decisionModalOpen}
+          decisionType={decisionType}
+          submissionTitle={currentSubmission.title}
+          complianceScore={currentSubmission.compliance_score ?? null}
+          openFindingsCount={openFindingsCount}
+          onClose={() => setDecisionModalOpen(false)}
+          onConfirm={handleConfirmDecision}
+        />
+      )}
     </div>
   );
 };
