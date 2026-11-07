@@ -113,6 +113,72 @@ export interface ComplianceMetrics {
   critical_findings: number;
 }
 
+export type FindingCategory =
+  | 'TONE'
+  | 'TERMINOLOGY'
+  | 'CLAIM_VERIFICATION'
+  | 'BRAND_CONSISTENCY'
+  | 'GRAMMAR'
+  | string;
+
+export type FindingSeverity = 'CRITICAL' | 'WARNING' | 'INFO' | string;
+
+export interface FindingResponse {
+  id: string;
+  submission_id: string;
+  ai_finding_id?: string | null;
+  category: FindingCategory;
+  severity: FindingSeverity;
+  original_text: string;
+  matched_text?: string | null;
+  explanation: string;
+  suggestion: string;
+  violated_guideline?: string | null;
+  rule_reference?: string | null;
+  evidence?: string | null;
+  confidence?: number | null;
+  finding_status?: string | null;
+  is_resolved: boolean;
+  created_at: string;
+}
+
+export interface RevisionResponse {
+  id: string;
+  submission_id: string;
+  version: number;
+  content: string;
+  changes_summary?: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ApprovalResponse {
+  id: string;
+  submission_id: string;
+  decision: 'APPROVED' | 'REJECTED';
+  reviewer_id: string;
+  comments?: string | null;
+  created_at: string;
+}
+
+export interface SubmissionCreatePayload {
+  brand_id: string;
+  title: string;
+  content: string;
+  channel?: string;
+}
+
+export interface SubmissionUpdatePayload {
+  title?: string;
+  content?: string;
+  channel?: string;
+}
+
+export interface RevisionCreatePayload {
+  content: string;
+  changes_summary?: string;
+}
+
 export interface BackendSubmissionResponse {
   id: string;
   brand_id: string;
@@ -120,14 +186,20 @@ export interface BackendSubmissionResponse {
   title: string;
   content: string;
   channel?: string | null;
-  status: string; // APPROVED, NEEDS_REVIEW, REJECTED, DRAFT
+  status: string; // APPROVED, NEEDS_REVIEW, REJECTED, DRAFT, ANALYZING
   submitted_by: string;
   compliance_score?: number | null;
-  overall_status?: string | null;
+  overall_status?: string | null; // COMPLIANT, FLAGGED, NON_COMPLIANT
   summary?: string | null;
   corrected_content?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface SubmissionDetailResponse extends BackendSubmissionResponse {
+  findings: FindingResponse[];
+  revisions: RevisionResponse[];
+  approvals: ApprovalResponse[];
 }
 
 export interface DashboardSummaryResponse {
