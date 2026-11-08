@@ -12,7 +12,9 @@ import {
   RevisionResponse,
   SubmissionCreatePayload,
   SubmissionDetailResponse,
+  SubmissionFromUrlPayload,
   SubmissionUpdatePayload,
+  UrlExtractResponse,
 } from '../types';
 
 export const submissionService = {
@@ -105,6 +107,20 @@ export const submissionService = {
     return httpClient.post<ApprovalResponse>(`/submissions/${submissionId}/reject`, {
       comments: comments || null,
     });
+  },
+
+  /**
+   * Safely extract visible marketing copy from a website URL.
+   */
+  async extractUrl(url: string): Promise<UrlExtractResponse> {
+    return httpClient.post<UrlExtractResponse>('/submissions/extract-url', { url });
+  },
+
+  /**
+   * Extract website copy and immediately run full brand compliance analysis.
+   */
+  async submitFromUrl(payload: SubmissionFromUrlPayload): Promise<SubmissionDetailResponse> {
+    return httpClient.post<SubmissionDetailResponse>('/submissions/from-url', payload);
   },
 };
 

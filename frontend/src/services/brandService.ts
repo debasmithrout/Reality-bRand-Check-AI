@@ -5,11 +5,19 @@
 
 import { httpClient } from './httpClient';
 import {
+  ApprovedFactCreatePayload,
+  ApprovedFactResponse,
+  ApprovedFactUpdatePayload,
   Brand,
+  BrandCreatePayload,
   BrandResponse,
+  BrandUpdatePayload,
+  GuidelineCreatePayload,
   GuidelineResponse,
+  TerminologyCreatePayload,
   TerminologyResponse,
   TerminologyType,
+  TerminologyUpdatePayload,
 } from '../types';
 
 /**
@@ -169,6 +177,108 @@ export const brandService = {
       this.getTerminology(brandId).catch(() => []),
     ]);
     return enrichBrand(rawBrand, guidelines, terminology);
+  },
+
+  /**
+   * Create a new brand profile in user's workspace.
+   */
+  async createBrand(data: BrandCreatePayload): Promise<BrandResponse> {
+    return httpClient.post<BrandResponse>('/brands', data);
+  },
+
+  /**
+   * Update an existing brand profile.
+   */
+  async updateBrand(brandId: string, data: BrandUpdatePayload): Promise<BrandResponse> {
+    return httpClient.patch<BrandResponse>(`/brands/${brandId}`, data);
+  },
+
+  /**
+   * Delete a brand and its associated rules/facts (Admin or Brand Creator).
+   */
+  async deleteBrand(brandId: string): Promise<{ id: string; deleted: boolean }> {
+    return httpClient.delete<{ id: string; deleted: boolean }>(`/brands/${brandId}`);
+  },
+
+  /**
+   * Create or update guidelines for a specific brand.
+   */
+  async saveGuidelines(brandId: string, data: GuidelineCreatePayload): Promise<GuidelineResponse> {
+    return httpClient.post<GuidelineResponse>(`/brands/${brandId}/guidelines`, data);
+  },
+
+  /**
+   * Register a new approved or prohibited term for a brand.
+   */
+  async createTerminology(
+    brandId: string,
+    data: TerminologyCreatePayload
+  ): Promise<TerminologyResponse> {
+    return httpClient.post<TerminologyResponse>(`/brands/${brandId}/terminology`, data);
+  },
+
+  /**
+   * Update an existing terminology rule.
+   */
+  async updateTerminology(
+    brandId: string,
+    termId: string,
+    data: TerminologyUpdatePayload
+  ): Promise<TerminologyResponse> {
+    return httpClient.patch<TerminologyResponse>(`/brands/${brandId}/terminology/${termId}`, data);
+  },
+
+  /**
+   * Delete a terminology rule.
+   */
+  async deleteTerminology(
+    brandId: string,
+    termId: string
+  ): Promise<{ id: string; deleted: boolean }> {
+    return httpClient.delete<{ id: string; deleted: boolean }>(
+      `/brands/${brandId}/terminology/${termId}`
+    );
+  },
+
+  /**
+   * List approved facts and claims for a brand.
+   */
+  async getFacts(brandId: string, statusFilter?: string): Promise<ApprovedFactResponse[]> {
+    const query = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : '';
+    return httpClient.get<ApprovedFactResponse[]>(`/brands/${brandId}/facts${query}`);
+  },
+
+  /**
+   * Register a verified approved fact for a brand.
+   */
+  async createFact(
+    brandId: string,
+    data: ApprovedFactCreatePayload
+  ): Promise<ApprovedFactResponse> {
+    return httpClient.post<ApprovedFactResponse>(`/brands/${brandId}/facts`, data);
+  },
+
+  /**
+   * Update an approved fact.
+   */
+  async updateFact(
+    brandId: string,
+    factId: string,
+    data: ApprovedFactUpdatePayload
+  ): Promise<ApprovedFactResponse> {
+    return httpClient.patch<ApprovedFactResponse>(`/brands/${brandId}/facts/${factId}`, data);
+  },
+
+  /**
+   * Delete an approved fact.
+   */
+  async deleteFact(
+    brandId: string,
+    factId: string
+  ): Promise<{ id: string; deleted: boolean }> {
+    return httpClient.delete<{ id: string; deleted: boolean }>(
+      `/brands/${brandId}/facts/${factId}`
+    );
   },
 };
 

@@ -65,5 +65,5 @@ def require_roles(allowed_roles: List[str]) -> Callable[[Profile], Profile]:
 # Role dependencies
 require_admin = require_roles(["ADMIN"])
 require_reviewer = require_roles(["ADMIN", "REVIEWER"])
-require_editor = require_roles(["ADMIN", "EDITOR", "REVIEWER"])
+require_editor = require_roles(["ADMIN", "EDITOR"])
 

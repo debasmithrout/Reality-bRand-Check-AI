@@ -85,6 +85,87 @@ export interface TerminologyResponse {
   updated_at: string;
 }
 
+export interface TerminologyCreatePayload {
+  term: string;
+  term_type: TerminologyType;
+  preferred_replacement?: string | null;
+  description?: string | null;
+  is_case_sensitive?: boolean;
+}
+
+export interface TerminologyUpdatePayload {
+  term?: string;
+  term_type?: TerminologyType;
+  preferred_replacement?: string | null;
+  description?: string | null;
+  is_case_sensitive?: boolean;
+}
+
+export interface BrandCreatePayload {
+  name: string;
+  description?: string;
+  industry?: string;
+  website?: string;
+}
+
+export interface BrandUpdatePayload {
+  name?: string;
+  description?: string;
+  industry?: string;
+  website?: string;
+  is_active?: boolean;
+}
+
+export interface GuidelineCreatePayload {
+  brand_personality?: any;
+  tone_of_voice?: any;
+  messaging_rules?: any;
+  additional_guidelines?: string;
+}
+
+export interface ApprovedFactResponse {
+  id: string;
+  brand_id: string;
+  claim: string;
+  evidence: string;
+  source?: string | null;
+  approval_status: 'APPROVED' | 'PENDING_REVIEW' | 'DEPRECATED' | string;
+  tags?: any;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApprovedFactCreatePayload {
+  claim: string;
+  evidence: string;
+  source?: string;
+  approval_status?: string;
+  tags?: any;
+}
+
+export interface ApprovedFactUpdatePayload {
+  claim?: string;
+  evidence?: string;
+  source?: string;
+  approval_status?: string;
+  tags?: any;
+}
+
+export interface UrlExtractResponse {
+  url: string;
+  title: string;
+  content: string;
+  character_count: number;
+  word_count: number;
+}
+
+export interface SubmissionFromUrlPayload {
+  brand_id: string;
+  url: string;
+  title?: string;
+  channel?: string;
+}
+
 // Enriched Brand Model used by frontend components
 export interface Brand {
   id: string;

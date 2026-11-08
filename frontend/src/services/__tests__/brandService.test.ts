@@ -269,5 +269,63 @@ describe('brandService and helper functions', () => {
         expect.any(Object)
       );
     });
+
+    it('createBrand calls POST /brands', async () => {
+      const newBrand: BrandResponse = {
+        id: 'b2',
+        workspace_id: 'w1',
+        name: 'New Brand',
+        is_active: true,
+        created_by: 'u1',
+        created_at: '',
+        updated_at: '',
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: newBrand,
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await brandService.createBrand({ name: 'New Brand' });
+      expect(res).toEqual(newBrand);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/brands'),
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    it('getFacts and createFact call /brands/:id/facts endpoints', async () => {
+      const fakeFact = {
+        id: 'f1',
+        brand_id: 'b1',
+        claim: '40% organic',
+        evidence: 'GOTS cert',
+        approval_status: 'APPROVED',
+        created_at: '',
+        updated_at: '',
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: [fakeFact],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await brandService.getFacts('b1', 'APPROVED');
+      expect(res).toEqual([fakeFact]);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/brands/b1/facts?status=APPROVED'),
+        expect.any(Object)
+      );
+    });
   });
 });

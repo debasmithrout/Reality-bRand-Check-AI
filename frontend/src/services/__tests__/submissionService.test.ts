@@ -468,6 +468,74 @@ describe('submissionService and analysis workflow', () => {
         /Only users with REVIEWER or ADMIN role/
       );
     });
+
+    it('extractUrl calls POST /submissions/extract-url', async () => {
+      const mockResult = {
+        url: 'https://example.com',
+        title: 'Example Domain',
+        content: 'Example copy for testing.',
+        character_count: 25,
+        word_count: 4,
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: mockResult,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await submissionService.extractUrl('https://example.com');
+      expect(res).toEqual(mockResult);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/submissions/extract-url'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ url: 'https://example.com' }),
+        })
+      );
+    });
+
+    it('submitFromUrl calls POST /submissions/from-url', async () => {
+      const mockAnalyzed = {
+        id: 'sub-url-1',
+        brand_id: 'b1',
+        workspace_id: 'w1',
+        title: 'Website Copy',
+        content: 'Web content here',
+        channel: 'Website',
+        status: 'NEEDS_REVIEW',
+        submitted_by: 'u1',
+        findings: [],
+        revisions: [],
+        approvals: [],
+        created_at: '',
+        updated_at: '',
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: mockAnalyzed,
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const res = await submissionService.submitFromUrl({
+        brand_id: 'b1',
+        url: 'https://example.com',
+      });
+      expect(res.id).toBe('sub-url-1');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/submissions/from-url'),
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
   });
 });
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { FindingsList } from '../components/review/FindingsList';
@@ -27,6 +28,10 @@ import {
   Cpu,
   ShieldCheck,
   Lock,
+  Globe,
+  Building2,
+  FileText,
+  ArrowRight,
 } from 'lucide-react';
 import { ApiError } from '../services/httpClient';
 
@@ -44,6 +49,16 @@ export const ContentReviewPage: React.FC = () => {
   const [campaignTitle, setCampaignTitle] = useState<string>('Q4 Campaign Copy Review');
   const [channel, setChannel] = useState<string>('Social Media');
   const [inputText, setInputText] = useState<string>('');
+
+  // Mode: Manual Copy vs Website URL (SSRF Protected)
+  const [inputMode, setInputMode] = useState<'TEXT' | 'URL'>('TEXT');
+  const [websiteUrl, setWebsiteUrl] = useState<string>('');
+  const [isExtractingUrl, setIsExtractingUrl] = useState<boolean>(false);
+  const [extractedUrlMetadata, setExtractedUrlMetadata] = useState<{
+    url: string;
+    title: string;
+    wordCount: number;
+  } | null>(null);
 
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -187,6 +202,76 @@ export const ContentReviewPage: React.FC = () => {
       } else {
         setAnalysisError('An unexpected network or service error occurred during analysis.');
       }
+    } finally {
+      setIsAnalyzing(false);
+      setAnalysisStage('');
+    }
+  };
+
+  // Extract webpage text and populate editor
+  const handleExtractUrlCopy = async () => {
+    if (!websiteUrl.trim()) {
+      setValidationError('Please enter a valid website URL (http:// or https://).');
+      return;
+    }
+    setValidationError(null);
+    setAnalysisError(null);
+    setIsExtractingUrl(true);
+    try {
+      const res = await submissionService.extractUrl(websiteUrl.trim());
+      setInputText(res.content);
+      if (res.title) {
+        setCampaignTitle(`Website Audit: ${res.title}`);
+      }
+      setChannel('Web Landing Page');
+      setExtractedUrlMetadata({
+        url: res.url,
+        title: res.title,
+        wordCount: res.word_count,
+      });
+      setInputMode('TEXT'); // Switch to editor so user can review the extracted text
+    } catch (err: any) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to extract website copy.';
+      setValidationError(msg);
+    } finally {
+      setIsExtractingUrl(false);
+    }
+  };
+
+  // Direct 1-click Website Audit (SSRF Protected)
+  const handleAnalyzeWebsiteDirect = async () => {
+    if (!selectedBrandId) {
+      setValidationError('Please select an active brand profile before auditing.');
+      return;
+    }
+    if (!websiteUrl.trim()) {
+      setValidationError('Please enter a valid website URL to audit.');
+      return;
+    }
+
+    setValidationError(null);
+    setAnalysisError(null);
+    setIsAnalyzing(true);
+    setAnalysisStage('Validating website URL and security checks...');
+
+    try {
+      setAnalysisStage('Extracting webpage content and evaluating brand compliance...');
+      const analyzedSub = await submissionService.submitFromUrl({
+        brand_id: selectedBrandId,
+        url: websiteUrl.trim(),
+        title: campaignTitle.trim() || undefined,
+        channel: 'Web Landing Page',
+      });
+      setCurrentSubmission(analyzedSub);
+      setInputText(analyzedSub.content);
+      setExtractedUrlMetadata({
+        url: websiteUrl.trim(),
+        title: analyzedSub.title,
+        wordCount: analyzedSub.content.split(' ').length,
+      });
+    } catch (err: any) {
+      const msg = err instanceof ApiError ? err.message : 'Website audit failed.';
+      setAnalysisError(msg);
     } finally {
       setIsAnalyzing(false);
       setAnalysisStage('');
@@ -338,8 +423,22 @@ export const ContentReviewPage: React.FC = () => {
                     <span>Loading workspace brands...</span>
                   </div>
                 ) : brands.length === 0 ? (
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
-                    No active brand profiles found in this workspace. Please create a brand first.
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-2">
+                    <div className="flex items-center gap-2 font-bold">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>No active brand profiles found in this workspace</span>
+                    </div>
+                    <p className="text-amber-800 leading-relaxed">
+                      Please configure a brand profile first to establish voice tone parameters, prohibited terminology, and verified evidence.
+                    </p>
+                    <Link
+                      to="/brands"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium text-xs shadow-xs"
+                    >
+                      <Building2 className="h-3.5 w-3.5" />
+                      <span>Create Brand Profile</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
                   </div>
                 ) : (
                   <select
@@ -398,6 +497,99 @@ export const ContentReviewPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Input Mode Selector */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">
+                  Content Source Mode
+                </label>
+                <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setInputMode('TEXT')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors ${
+                      inputMode === 'TEXT'
+                        ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Direct Copy</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInputMode('URL')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors ${
+                      inputMode === 'URL'
+                        ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>Website URL Audit</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Website URL Crawler Mode Box */}
+              {inputMode === 'URL' && (
+                <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-xl space-y-3 text-xs">
+                  <div>
+                    <label htmlFor="website-url" className="block font-bold text-gray-800 mb-1">
+                      Webpage URL to Crawl & Verify
+                    </label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        id="website-url"
+                        type="url"
+                        value={websiteUrl}
+                        onChange={(e) => setWebsiteUrl(e.target.value)}
+                        disabled={isAnalyzing || isExtractingUrl}
+                        placeholder="https://velora-couture.com/campaign"
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-gray-500">
+                    <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                      SSRF Protected (Private IPs, cloud metadata & loopbacks blocked)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleExtractUrlCopy}
+                      disabled={isExtractingUrl || isAnalyzing || !websiteUrl.trim()}
+                      className="flex-1 py-2 px-3 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg font-semibold text-gray-700 transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                    >
+                      {isExtractingUrl ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-600" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5 text-blue-600" />
+                      )}
+                      <span>Extract to Editor</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeWebsiteDirect}
+                      disabled={isAnalyzing || isExtractingUrl || !websiteUrl.trim() || !selectedBrandId}
+                      className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      {isAnalyzing ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      <span>Direct Audit</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Campaign Title & Channel */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -450,7 +642,9 @@ export const ContentReviewPage: React.FC = () => {
                   >
                     Marketing Copy to Verify
                   </label>
-                  <span className="text-xs text-gray-400 font-mono">{inputText.length} chars</span>
+                  <span className="text-xs text-gray-400 font-mono">
+                    {inputText.length} chars • {inputText.trim() ? inputText.trim().split(/\s+/).length : 0} words
+                  </span>
                 </div>
                 <textarea
                   id="content-input"
@@ -543,6 +737,14 @@ export const ContentReviewPage: React.FC = () => {
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
                           <Sparkles className="h-3 w-3 text-indigo-600" />
                           <span>Gemini AI Engine</span>
+                        </span>
+                      )}
+
+                      {/* Website Source Tag if crawled */}
+                      {(extractedUrlMetadata || currentSubmission.channel === 'Website' || currentSubmission.channel === 'Web Landing Page') && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                          <Globe className="h-3 w-3 text-blue-600" />
+                          <span>Web Content Verified</span>
                         </span>
                       )}
 

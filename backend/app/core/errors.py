@@ -55,6 +55,16 @@ class ConflictException(AppException):
         )
 
 
+class ValidationException(AppException):
+    def __init__(self, message: str, details: Optional[List[Any]] = None):
+        super().__init__(
+            message=message,
+            code="VALIDATION_ERROR",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details=details,
+        )
+
+
 class StateTransitionException(AppException):
     def __init__(self, message: str):
         super().__init__(

@@ -12,6 +12,25 @@ class SubmissionCreate(BaseModel):
     channel: Optional[str] = "Blog"
 
 
+class SubmissionUrlExtractRequest(BaseModel):
+    url: str = Field(..., min_length=4)
+
+
+class SubmissionUrlExtractResponse(BaseModel):
+    url: str
+    title: str
+    content: str
+    character_count: int
+    word_count: int
+
+
+class SubmissionFromUrlCreate(BaseModel):
+    brand_id: str
+    url: str = Field(..., min_length=4)
+    title: Optional[str] = None
+    channel: Optional[str] = "Website"
+
+
 class SubmissionUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     content: Optional[str] = Field(None, min_length=1)

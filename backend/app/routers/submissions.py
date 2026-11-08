@@ -12,11 +12,15 @@ from app.schemas.submission import (
     RevisionResponse,
     SubmissionCreate,
     SubmissionDetailResponse,
+    SubmissionFromUrlCreate,
     SubmissionResponse,
     SubmissionUpdate,
+    SubmissionUrlExtractRequest,
+    SubmissionUrlExtractResponse,
 )
 from app.services.analysis_service import AnalysisService
 from app.services.submission_service import SubmissionService
+from app.services.url_extractor import URLExtractorService
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
@@ -34,6 +38,50 @@ def create_submission(
     return APIResponse(
         data=SubmissionResponse.model_validate(submission),
         message="Submission created successfully.",
+    )
+
+
+@router.post("/extract-url", response_model=APIResponse[SubmissionUrlExtractResponse])
+async def extract_url_content(
+    payload: SubmissionUrlExtractRequest,
+    current_user: Profile = Depends(get_current_user),
+):
+    """
+    Safely extract readable marketing copy from a web URL with SSRF protection.
+    """
+    extracted = await URLExtractorService.fetch_and_extract(payload.url)
+    return APIResponse(
+        data=SubmissionUrlExtractResponse(**extracted),
+        message="Webpage content extracted successfully.",
+    )
+
+
+@router.post("/from-url", response_model=APIResponse[SubmissionDetailResponse], status_code=status.HTTP_201_CREATED)
+async def create_submission_from_url(
+    payload: SubmissionFromUrlCreate,
+    current_user: Profile = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    """
+    Extract visible marketing copy from a verified website URL and immediately
+    run brand compliance analysis against the brand's knowledge base.
+    """
+    extracted = await URLExtractorService.fetch_and_extract(payload.url)
+    title = payload.title or extracted.get("title") or f"Website Audit: {extracted['url']}"
+
+    submission_payload = SubmissionCreate(
+        brand_id=payload.brand_id,
+        title=title[:255],
+        content=extracted["content"],
+        channel=payload.channel or "Website",
+    )
+
+    submission = SubmissionService.create_submission(db, submission_payload, current_user)
+    analyzed_submission = await AnalysisService.run_analysis(db, submission.id, current_user)
+
+    return APIResponse(
+        data=SubmissionDetailResponse.model_validate(analyzed_submission),
+        message="Website content extracted and analyzed successfully.",
     )
 
 
